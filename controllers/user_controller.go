@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -94,6 +95,32 @@ func Login(c echo.Context) error {
 	return response.Success(c, echo.Map{"token": tokenString}, "Login berhasil")
 }
 
+// POST /auth/refresh
+func RefreshToken(c echo.Context) error {
+	userData := c.Get("user").(*jwt.Token)
+	claims := userData.Claims.(jwt.MapClaims)
+
+	// Buat token baru dengan data yang sama
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": claims["user_id"],
+		"name":    claims["name"],
+		"role":    claims["role"],
+		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	secret := config.Get("JWT_SECRET")
+	if secret == "" {
+		secret = "secret"
+	}
+
+	tokenString, err := newToken.SignedString([]byte(secret))
+	if err != nil {
+		return response.Error(c, http.StatusInternalServerError, "Gagal refresh token")
+	}
+
+	return response.Success(c, echo.Map{"token": tokenString}, "Token berhasil diperbarui")
+}
+
 // GET /user/me
 func GetProfile(c echo.Context) error {
 	userData := c.Get("user").(*jwt.Token)
@@ -104,4 +131,40 @@ func GetProfile(c echo.Context) error {
 		"name":    claims["name"],
 		"role":    claims["role"],
 	}, "Profil pengguna berhasil dimuat")
+}
+
+// GET /admin/users
+func GetAllUsers(c echo.Context) error {
+	var users []models.User
+	if err := database.DB.Preload("Role").Find(&users).Error; err != nil {
+		return response.Error(c, http.StatusInternalServerError, "Gagal mengambil data user")
+	}
+	return response.Success(c, users, "Data user berhasil dimuat")
+}
+
+// PUT /admin/users/:id/role
+func UpdateUserRole(c echo.Context) error {
+	userID := c.Param("id")
+	roleID := c.FormValue("role_id")
+
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "ID user tidak valid")
+	}
+	rid, err := uuid.Parse(roleID)
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "ID role tidak valid")
+	}
+
+	var user models.User
+	if err := database.DB.First(&user, "id = ?", uid).Error; err != nil {
+		return response.Error(c, http.StatusNotFound, "User tidak ditemukan")
+	}
+
+	user.RoleID = rid
+	if err := database.DB.Save(&user).Error; err != nil {
+		return response.Error(c, http.StatusInternalServerError, "Gagal memperbarui role user")
+	}
+
+	return response.Success(c, user, "Role user berhasil diperbarui")
 }
