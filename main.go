@@ -37,6 +37,8 @@ func main() {
 
 	// Inisialisasi routes
 	routes.UserRoutes(e)
+	routes.ArticleRoutes(e)
+
 
 	// Jalankan server
 	fmt.Println("Server berjalan di port:", port)
