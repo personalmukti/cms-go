@@ -2,11 +2,17 @@ package controllers
 
 import (
 	"cms-go-2/database"
+	"cms-go-2/middleware"
 	"cms-go-2/models"
 	"cms-go-2/response"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -90,47 +96,90 @@ func CreateArticle(c echo.Context) error {
 	claims := user.Claims.(jwt.MapClaims)
 	userID := claims["user_id"].(string)
 
-	var input models.Article
-	if err := c.Bind(&input); err != nil {
-		return response.Error(c, http.StatusBadRequest, "Input tidak valid")
+	title := c.FormValue("title")
+	content := c.FormValue("content")
+	status := c.FormValue("status")
+
+	// Upload file gambar jika ada
+	imageURL := ""
+	file, err := c.FormFile("image")
+	if err == nil {
+		src, _ := file.Open()
+		defer src.Close()
+
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		dstPath := filepath.Join("uploads", filename)
+		dst, _ := os.Create(dstPath)
+		defer dst.Close()
+
+		io.Copy(dst, src)
+		imageURL = "/uploads/" + filename
 	}
 
-	input.AuthorID = uuid.MustParse(userID)
+	article := models.Article{
+		Title:     title,
+		Content:   content,
+		Status:    status,
+		ImageURL:  imageURL,
+		AuthorID:  uuid.MustParse(userID),
+	}
 
-	if err := database.DB.Create(&input).Error; err != nil {
+	if err := database.DB.Create(&article).Error; err != nil {
 		return response.Error(c, http.StatusInternalServerError, "Gagal menyimpan artikel")
 	}
 
-	return response.Created(c, input, "Artikel berhasil dibuat")
+	return response.Created(c, article, "Artikel berhasil dibuat")
 }
+
 
 // PUT /articles/:id
 func UpdateArticle(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	claims := user.Claims.(jwt.MapClaims)
-	userID := claims["user_id"].(string)
-
 	articleID := c.Param("id")
-	var article models.Article
 
-	if err := database.DB.Where("id = ?", articleID).First(&article).Error; err != nil {
+	// Validasi UUID
+	id, err := uuid.Parse(articleID)
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "ID artikel tidak valid")
+	}
+
+	var article models.Article
+	if err := database.DB.Where("id = ?", id).First(&article).Error; err != nil {
 		return response.Error(c, http.StatusNotFound, "Artikel tidak ditemukan")
 	}
 
-	// Hanya author yang boleh update
-	if article.AuthorID.String() != userID {
-		return response.Error(c, http.StatusForbidden, "Anda tidak berhak mengubah artikel ini")
+	if !middleware.IsSelfOrAdmin(article.AuthorID, c) {
+		return response.Error(c, http.StatusForbidden, "Anda tidak berhak mengakses artikel ini")
 	}
 
-	var input models.Article
-	if err := c.Bind(&input); err != nil {
-		return response.Error(c, http.StatusBadRequest, "Input tidak valid")
+	// Ambil data baru dari form
+	title := c.FormValue("title")
+	content := c.FormValue("content")
+	status := c.FormValue("status")
+
+	if title != "" {
+		article.Title = title
+	}
+	if content != "" {
+		article.Content = content
+	}
+	if status != "" {
+		article.Status = status
 	}
 
-	article.Title = input.Title
-	article.Content = input.Content
-	article.Status = input.Status
-	article.ImageURL = input.ImageURL
+	// Jika ada file gambar baru, ganti
+	file, err := c.FormFile("image")
+	if err == nil {
+		src, _ := file.Open()
+		defer src.Close()
+
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		dstPath := filepath.Join("uploads", filename)
+		dst, _ := os.Create(dstPath)
+		defer dst.Close()
+
+		io.Copy(dst, src)
+		article.ImageURL = "/uploads/" + filename
+	}
 
 	if err := database.DB.Save(&article).Error; err != nil {
 		return response.Error(c, http.StatusInternalServerError, "Gagal mengupdate artikel")
