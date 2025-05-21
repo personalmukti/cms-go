@@ -29,7 +29,7 @@ func InitDB() error {
 	DB = db
 
 	// Migrasi tabel
-	err = db.AutoMigrate(&models.Role{}, &models.User{})
+	err = db.AutoMigrate(&models.Role{}, &models.User{}, &models.Article{})
 	if err != nil {
 		return err
 	}
@@ -37,6 +37,8 @@ func InitDB() error {
 	// Panggil seeder terpisah
 	seeders.SeedRoles(db)
 	seeders.SeedUsers(db)
+	seeders.SeedArticles(db)
+
 
 	return nil
 }
