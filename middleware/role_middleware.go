@@ -21,6 +21,7 @@ func IsAdmin(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// Akses khusus artikel (editor dan admin)
 func IsEditor(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		user := c.Get("user").(*jwt.Token)
@@ -34,6 +35,21 @@ func IsEditor(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+// Akses khusus static page (operator dan admin)
+func IsContentManager(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		user := c.Get("user").(*jwt.Token)
+		claims := user.Claims.(jwt.MapClaims)
+
+		role := claims["role"]
+		if role != "operator" && role != "admin" {
+			return response.Error(c, http.StatusForbidden, "Akses hanya untuk operator atau admin")
+		}
+		return next(c)
+	}
+}
+
+// Hanya operator murni
 func IsOperator(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		user := c.Get("user").(*jwt.Token)
@@ -46,7 +62,7 @@ func IsOperator(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
-// Mengecek apakah user adalah admin atau pemilik data (artikel, dsb)
+// Mengecek apakah user adalah admin atau pemilik data
 func IsSelfOrAdmin(resourceAuthorID uuid.UUID, c echo.Context) bool {
 	user := c.Get("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
