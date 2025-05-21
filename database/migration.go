@@ -34,6 +34,9 @@ func InitDB() error {
 		&models.User{}, 
 		&models.Article{}, 
 		&models.StaticPage{},
+		&models.Category{},
+		&models.Tag{},
+		&models.ArticleTag{},
 	)
 	if err != nil {
 		return err
@@ -44,6 +47,7 @@ func InitDB() error {
 	seeders.SeedUsers(db)
 	seeders.SeedArticles(db)
 	seeders.SeedStaticPages(db)
+	seeders.SeedCategoryAndTag(db)
 
 	return nil
 }

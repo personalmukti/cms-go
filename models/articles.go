@@ -17,6 +17,9 @@ type Article struct {
 	ImageURL  string         `gorm:"type:varchar(255)" json:"image_url"`
 	AuthorID  uuid.UUID      `gorm:"type:uuid" json:"author_id"`
 	Author    User           `gorm:"foreignKey:AuthorID" json:"author"`
+	CategoryID uuid.UUID `gorm:"type:uuid" json:"category_id"`
+	Category   Category  `gorm:"foreignKey:CategoryID" json:"category"`
+	Tags       []Tag     `gorm:"many2many:article_tags" json:"tags"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

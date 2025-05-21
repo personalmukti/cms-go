@@ -42,6 +42,7 @@ func main() {
 	routes.ArticleRoutes(e)
 	routes.UploadRoutes(e)
 	routes.StaticPageRoutes(e)
+	routes.CategoryTagRoutes(e)
 
 	// Jalankan server
 	fmt.Println("Server berjalan di port:", port)
