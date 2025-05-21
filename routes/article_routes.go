@@ -11,6 +11,7 @@ func ArticleRoutes(e *echo.Echo) {
 	article := e.Group("/articles")
 	article.GET("", controllers.GetArticles)
 	article.GET("/:id", controllers.GetArticleByID)
+	article.GET("/slug/:slug", controllers.GetArticleBySlug)
 
 	// proteksi dengan JWT
 	article.Use(middleware.JWTMiddleware)

@@ -5,6 +5,8 @@ import (
 	"cms-go-2/models"
 	"cms-go-2/response"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -13,12 +15,59 @@ import (
 
 // GET /articles
 func GetArticles(c echo.Context) error {
+	// Query parameter
+	page := c.QueryParam("page")
+	limit := c.QueryParam("limit")
+	q := c.QueryParam("q")
+	status := c.QueryParam("status")
+
+	// Default nilai
+	pageInt, _ := strconv.Atoi(page)
+	limitInt, _ := strconv.Atoi(limit)
+	if pageInt <= 0 {
+		pageInt = 1
+	}
+	if limitInt <= 0 {
+		limitInt = 10
+	}
+	offset := (pageInt - 1) * limitInt
+
 	var articles []models.Article
-	if err := database.DB.Preload("Author").Where("status = ?", "published").Find(&articles).Error; err != nil {
+	query := database.DB.Preload("Author")
+
+	// Filter status
+	if status != "" {
+		query = query.Where("status = ?", status)
+	} else {
+		query = query.Where("status = ?", "published")
+	}
+
+	// Search title
+	if q != "" {
+		query = query.Where("LOWER(title) LIKE ?", "%"+strings.ToLower(q)+"%")
+	}
+
+	// Hitung total
+	var total int64
+	query.Model(&models.Article{}).Count(&total)
+
+	// Ambil data dengan pagination
+	if err := query.Offset(offset).Limit(limitInt).Find(&articles).Error; err != nil {
 		return response.Error(c, http.StatusInternalServerError, "Gagal mengambil data artikel")
 	}
-	return response.Success(c, articles, "Daftar artikel berhasil dimuat")
+
+	// Format respon paginasi
+	result := echo.Map{
+		"data":       articles,
+		"page":       pageInt,
+		"limit":      limitInt,
+		"total":      total,
+		"total_page": int((total + int64(limitInt) - 1) / int64(limitInt)),
+	}
+
+	return response.Success(c, result, "Daftar artikel berhasil dimuat")
 }
+
 
 // GET /articles/:id
 func GetArticleByID(c echo.Context) error {
@@ -114,4 +163,17 @@ func DeleteArticle(c echo.Context) error {
 	}
 
 	return response.Success(c, nil, "Artikel berhasil dihapus")
+}
+// GET /articles/slug/:slug
+func GetArticleBySlug(c echo.Context) error {
+	slug := c.Param("slug")
+
+	var article models.Article
+	if err := database.DB.Preload("Author").
+		Where("slug = ? AND status = ?", slug, "published").
+		First(&article).Error; err != nil {
+		return response.Error(c, http.StatusNotFound, "Artikel tidak ditemukan")
+	}
+
+	return response.Success(c, article, "Detail artikel berhasil dimuat")
 }

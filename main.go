@@ -29,6 +29,8 @@ func main() {
 
 	// Inisialisasi Echo
 	e := echo.New()
+	e.Static("/uploads", "uploads")
+
 
 	// Tes route awal
 	e.GET("/", func(c echo.Context) error {
@@ -38,6 +40,8 @@ func main() {
 	// Inisialisasi routes
 	routes.UserRoutes(e)
 	routes.ArticleRoutes(e)
+	routes.UploadRoutes(e)
+
 
 
 	// Jalankan server
